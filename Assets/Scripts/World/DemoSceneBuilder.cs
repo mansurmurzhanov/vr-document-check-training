@@ -127,7 +127,7 @@ namespace TrainingDemo
 
         private Text Label3D(string value, Vector3 position, float size, Color color, TextAnchor alignment = TextAnchor.MiddleCenter, float width = 4f)
         {
-            var obj = new GameObject("Label: " + value, typeof(Text)); obj.transform.position = position; obj.transform.rotation = Quaternion.LookRotation(obj.transform.position - _camera.transform.position);
+            var obj = new GameObject("Label: " + value, typeof(Text)); obj.transform.position = position; obj.transform.rotation = Quaternion.LookRotation(_camera.transform.position - obj.transform.position);
             obj.transform.localScale = Vector3.one * .01f;
             var text = obj.GetComponent<Text>(); text.font = _font; text.text = value; text.fontSize = Mathf.RoundToInt(size * 100); text.color = color; text.alignment = alignment; text.horizontalOverflow = HorizontalWrapMode.Wrap; text.verticalOverflow = VerticalWrapMode.Overflow;
             text.rectTransform.sizeDelta = new Vector2(width * 100, 220); return text;

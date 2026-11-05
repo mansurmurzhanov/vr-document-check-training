@@ -62,7 +62,16 @@ namespace TrainingDemo
 
         private void UpdateFocus()
         {
-            var ray = new Ray(viewCamera.transform.position, viewCamera.transform.forward);
+            var origin = viewCamera.transform.position;
+            var direction = viewCamera.transform.forward;
+            if (XRSettings.isDeviceActive && TryGetHand(out var hand) &&
+                hand.TryGetFeatureValue(CommonUsages.devicePosition, out var handPosition) &&
+                hand.TryGetFeatureValue(CommonUsages.deviceRotation, out var handRotation))
+            {
+                origin = transform.TransformPoint(handPosition);
+                direction = transform.rotation * handRotation * Vector3.forward;
+            }
+            var ray = new Ray(origin, direction);
             var next = Physics.Raycast(ray, out var hit, 3.2f) ? hit.collider.GetComponentInParent<InteractableTarget>() : null;
             if (_focused == next) return;
             _focused?.SetHighlighted(false);
