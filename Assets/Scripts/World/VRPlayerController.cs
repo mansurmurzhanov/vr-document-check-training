@@ -25,7 +25,6 @@ namespace TrainingDemo
 
         private void Update()
         {
-            if (ScenarioRunner.Instance != null && ScenarioRunner.Instance.IsComplete) return;
             var desktop = !XRSettings.isDeviceActive;
             var horizontal = Input.GetAxisRaw("Horizontal");
             var vertical = Input.GetAxisRaw("Vertical");
