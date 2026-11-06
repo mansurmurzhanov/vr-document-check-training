@@ -30,6 +30,8 @@ namespace TrainingDemo
             Definition = ScenarioDefinition.CreateDemo();
             foreach (var group in Definition.groups) _statuses.Add(new StepStatus[group.steps.Length]);
             _audio = gameObject.AddComponent<AudioSource>();
+            _audio.spatialBlend = 0f;
+            _audio.playOnAwake = false;
             _okTone = Tone(880f, 0.12f);
             _errorTone = Tone(220f, 0.24f);
             LastMessage = CurrentStep.instruction;
@@ -52,20 +54,21 @@ namespace TrainingDemo
             {
                 _statuses[GroupIndex][StepIndex] = StepStatus.Success;
                 Play(_okTone);
-                LastMessage = "Верно: " + expected.title;
+                var feedback = "✓ Выполнено: " + expected.title;
                 Advance();
+                SetFeedback(feedback);
                 return true;
             }
 
             Play(_errorTone);
-            LastMessage = "Ошибка: " + (targetId == expected.targetId ? "действие выполнено не в тот момент." : "выбран неверный объект или зона.");
+            var feedbackText = "Ошибка: " + (targetId == expected.targetId ? "действие выполнено не в тот момент." : "выбран неверный объект или зона.");
             if (IsLaterStep(action, targetId))
             {
                 // Record the action that broke the order as a failure; later steps were never attempted.
                 _statuses[GroupIndex][StepIndex] = StepStatus.Failed;
                 for (var i = StepIndex + 1; i < CurrentGroup.steps.Length; i++)
                     if (_statuses[GroupIndex][i] == StepStatus.Pending) _statuses[GroupIndex][i] = StepStatus.Skipped;
-                LastMessage = "Нарушен порядок действий. Группа закрыта, незавершённые шаги пропущены.";
+                feedbackText = "Нарушен порядок действий. Группа закрыта, незавершённые шаги пропущены.";
                 AdvanceGroup();
             }
             else
@@ -73,7 +76,16 @@ namespace TrainingDemo
                 _statuses[GroupIndex][StepIndex] = StepStatus.Failed;
                 Advance();
             }
+            SetFeedback(feedbackText);
             return false;
+        }
+
+        private void SetFeedback(string feedback)
+        {
+            LastMessage = IsComplete
+                ? feedback + "\nСценарий завершён. Посмотрите результаты."
+                : feedback + "\nДалее: " + CurrentStep.instruction;
+            Changed?.Invoke();
         }
 
         public void ResetRun()

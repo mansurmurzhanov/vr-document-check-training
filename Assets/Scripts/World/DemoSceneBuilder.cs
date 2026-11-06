@@ -2,9 +2,15 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.XR;
 
 namespace TrainingDemo
 {
+    public static class DemoSceneFlow
+    {
+        public static bool TrainingRequested;
+    }
+
     public class DemoSceneBuilder : MonoBehaviour
     {
         public bool isLobby;
@@ -17,6 +23,13 @@ namespace TrainingDemo
 
         private void Awake()
         {
+            // Pressing Play while the editor is on Training should still demonstrate the lobby first.
+            if (!isLobby && Application.isEditor && !DemoSceneFlow.TrainingRequested)
+            {
+                SceneManager.LoadScene("Lobby", LoadSceneMode.Single);
+                return;
+            }
+
             _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             BuildRoom();
             BuildPlayer();
@@ -27,7 +40,7 @@ namespace TrainingDemo
         private void Update()
         {
             if (isLobby && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
-                SceneManager.LoadScene("Training");
+                StartTraining();
         }
 
         private void BuildRoom()
@@ -77,8 +90,8 @@ namespace TrainingDemo
         {
             Title("Лобби", "Тренировка: проверка документов\nПройдите три группы действий. Следуйте подсказкам и обращайте внимание на подсветку.");
             var start = UIButton(_canvasRoot, "Start training button", "НАЧАТЬ ТРЕНИРОВКУ", new Vector2(.5f, .5f), new Vector2(0, -110), new Vector2(420, 72), new Color(.08f, .48f, .53f));
-            start.onClick.AddListener(() => SceneManager.LoadScene("Training"));
-            Station("Старт тренировки", "Начать", "lobby_start", ActionKind.Click, new Vector3(0, 1.62f, 2.8f), new Color(.08f, .48f, .53f), () => SceneManager.LoadScene("Training"));
+            start.onClick.AddListener(StartTraining);
+            Station("Старт тренировки", "Начать", "lobby_start", ActionKind.Click, new Vector3(0, 1.62f, 2.8f), new Color(.08f, .48f, .53f), StartTraining);
             Label3D("Нажмите кнопку или Enter / пробел\nWASD — движение · мышь — обзор · E — действие", new Vector3(0, 2.35f, 3f), 0.045f, Color.white);
         }
 
@@ -86,7 +99,8 @@ namespace TrainingDemo
         {
             Title("Тренировка", "Выполните действия в указанном порядке. Ошибки фиксируются в результатах.");
             var runner = FindObjectOfType<ScenarioRunner>();
-            var hud = gameObject.AddComponent<TrainingHudUpdater>(); hud.Init(_progress, _message, _resultPanel, _camera, _font, runner);
+            var player = FindObjectOfType<VRPlayerController>();
+            var hud = gameObject.AddComponent<TrainingHudUpdater>(); hud.Init(_progress, _message, _resultPanel, _camera, _font, runner, player);
 
             var positions = new[] { new Vector3(-3.6f, 0, 6f), new Vector3(0, 0, 9f), new Vector3(3.6f, 0, 6f) };
             var titles = new[] { "01  Подготовка", "02  Проверка документов", "03  Подтверждение" };
@@ -100,7 +114,7 @@ namespace TrainingDemo
                 station.transform.rotation = Quaternion.identity;
                 Label3D(titles[i], p + new Vector3(0, 2.4f, .65f), .055f, Color.white);
                 var zone = Primitive(PrimitiveType.Cylinder, "Подсвеченная зона " + (i + 1), p + new Vector3(0, .04f, -.25f), new Vector3(2.7f, .04f, 1.3f), new Color(.1f, .72f, .77f));
-                var zoneTarget = zone.AddComponent<InteractableTarget>(); zoneTarget.targetId = "zone_" + (i + 1); zoneTarget.action = ActionKind.Approach;
+                var zoneTarget = zone.AddComponent<InteractableTarget>(); zoneTarget.targetId = "zone_" + (i + 1); zoneTarget.action = ActionKind.Approach; zoneTarget.hint = "Войдите в эту подсвеченную зону";
                 var trigger = zone.GetComponent<Collider>(); trigger.isTrigger = true; zone.GetComponent<Renderer>().enabled = true;
                 zone.GetComponent<Renderer>().material.color = new Color(.06f, .38f, .42f, .5f);
                 var item = Primitive(PrimitiveType.Cube, instructions[i], p + new Vector3(-.45f, 1.23f, .6f), new Vector3(.6f, .15f, .42f), colors[i]);
@@ -110,7 +124,19 @@ namespace TrainingDemo
                 item.GetComponent<InteractableTarget>().hint = "Возьмите предмет";
                 Station("Кнопка " + buttons[i], buttons[i], "button_" + (i + 1), ActionKind.Click, p + new Vector3(.48f, 1.23f, .55f), colors[i], null);
             }
-            Station("В лобби", "В ЛОББИ", "return_lobby", ActionKind.Click, new Vector3(0, 1.05f, 11.3f), new Color(.38f, .24f, .25f), () => SceneManager.LoadScene("Lobby"));
+            Station("В лобби", "В ЛОББИ", "return_lobby", ActionKind.Click, new Vector3(0, 1.05f, 11.3f), new Color(.38f, .24f, .25f), ReturnToLobby);
+        }
+
+        private static void StartTraining()
+        {
+            DemoSceneFlow.TrainingRequested = true;
+            SceneManager.LoadScene("Training", LoadSceneMode.Single);
+        }
+
+        public static void ReturnToLobby()
+        {
+            DemoSceneFlow.TrainingRequested = false;
+            SceneManager.LoadScene("Lobby", LoadSceneMode.Single);
         }
 
         private void Title(string title, string subtitle)
@@ -123,7 +149,7 @@ namespace TrainingDemo
         {
             var button = Primitive(PrimitiveType.Cube, name, position, new Vector3(1.05f, .2f, .35f), color);
             var target = button.AddComponent<InteractableTarget>(); target.targetId = id; target.action = action; target.hint = label;
-            Label3D(label, position + Vector3.up * .28f, .035f, Color.white);
+            Label3D(label, position + Vector3.up * .28f + Vector3.back * .22f, .035f, Color.white);
             if (onClick != null)
             {
                 target.bypassScenario = true;
@@ -144,7 +170,8 @@ namespace TrainingDemo
             var obj = new GameObject("Label: " + value, typeof(RectTransform), typeof(Canvas));
             obj.transform.position = position;
             obj.transform.rotation = Quaternion.LookRotation(_camera.transform.position - position);
-            obj.transform.localScale = Vector3.one * .001f;
+            // The label faces the camera; compensate for the facing rotation so glyphs read left-to-right.
+            obj.transform.localScale = new Vector3(-.001f, .001f, .001f);
             var canvas = obj.GetComponent<Canvas>(); canvas.renderMode = RenderMode.WorldSpace; canvas.worldCamera = _camera;
             var fontSize = Mathf.Clamp(Mathf.RoundToInt(size * 1500f), 28, 180);
             var lineCount = value.Split('\n').Length;
@@ -196,22 +223,27 @@ namespace TrainingDemo
         private Text _progress, _message, _result;
         private GameObject _panel;
         private ScenarioRunner _runner;
+        private VRPlayerController _player;
         private Camera _camera;
         private Font _font;
+        private Transform _resultRoot;
 
-        public void Init(Text progress, Text message, GameObject panel, Camera camera, Font font, ScenarioRunner runner)
-        { _progress = progress; _message = message; _panel = panel; _camera = camera; _font = font; _runner = runner; }
+        public void Init(Text progress, Text message, GameObject panel, Camera camera, Font font, ScenarioRunner runner, VRPlayerController player)
+        { _progress = progress; _message = message; _panel = panel; _camera = camera; _font = font; _runner = runner; _player = player; }
 
         private void Update()
         {
             if (_runner == null) return;
             if (_runner.IsComplete)
             {
-                if (Input.GetKeyDown(KeyCode.R)) { _runner.ResetRun(); _panel.SetActive(false); _result = null; }
+                if (Input.GetKeyDown(KeyCode.R)) RestartRun();
+                else if (Input.GetKeyDown(KeyCode.L)) DemoSceneBuilder.ReturnToLobby();
                 return;
             }
             _progress.text = _runner.CurrentGroup.title + "     Шаг " + (_runner.StepIndex + 1) + " из " + _runner.CurrentGroup.steps.Length;
-            _message.text = _runner.LastMessage + "\n\nПодсвеченные предметы доступны. E / ЛКМ — действие, Esc — курсор.";
+            var focused = _player != null ? _player.FocusedTarget : null;
+            var focusHint = focused != null && !string.IsNullOrEmpty(focused.hint) ? "\n\n" + focused.hint : "";
+            _message.text = _runner.LastMessage + focusHint + "\n\nE / ЛКМ — действие · Esc — показать курсор.";
             if (_runner.IsComplete) ShowResults();
         }
 
@@ -223,8 +255,30 @@ namespace TrainingDemo
         private void ShowResults()
         {
             _panel.SetActive(true);
+            if (XRSettings.isDeviceActive)
+            {
+                var canvas = _panel.GetComponentInParent<Canvas>();
+                canvas.renderMode = RenderMode.WorldSpace;
+                canvas.worldCamera = _camera;
+                var scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler != null) { scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; scaler.scaleFactor = 1f; }
+                canvas.GetComponent<RectTransform>().sizeDelta = new Vector2(1600f, 900f);
+                canvas.transform.SetParent(_camera.transform, false);
+                canvas.transform.localPosition = new Vector3(0f, 0f, 1.8f);
+                canvas.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                // Reverse the horizontal scale as well so the front-facing UI remains readable.
+                canvas.transform.localScale = new Vector3(-.001f, .001f, .001f);
+            }
+            else
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
             if (_result != null) return;
-            var go = new GameObject("Result text", typeof(RectTransform), typeof(Text)); go.transform.SetParent(_panel.transform, false);
+            var root = new GameObject("Result content", typeof(RectTransform)); root.transform.SetParent(_panel.transform, false);
+            _resultRoot = root.transform;
+            var rootRect = root.GetComponent<RectTransform>(); rootRect.anchorMin = Vector2.zero; rootRect.anchorMax = Vector2.one; rootRect.offsetMin = Vector2.zero; rootRect.offsetMax = Vector2.zero;
+            var go = new GameObject("Result text", typeof(RectTransform), typeof(Text)); go.transform.SetParent(_resultRoot, false);
             var rect = go.GetComponent<RectTransform>(); rect.anchorMin = new Vector2(0, 1); rect.anchorMax = new Vector2(1, 1); rect.pivot = new Vector2(0, 1); rect.anchoredPosition = new Vector2(30, -24); rect.sizeDelta = new Vector2(-60, 490);
             _result = go.GetComponent<Text>(); _result.font = _font; _result.fontSize = 24; _result.color = Color.white; _result.alignment = TextAnchor.UpperLeft;
             var text = "ТРЕНИРОВКА ЗАВЕРШЕНА\nРезультаты по шагам\n\n";
@@ -239,17 +293,26 @@ namespace TrainingDemo
                 }
                 text += "\n";
             }
-            text += "Выберите действие ниже.";
+            text += "Мышь / правый триггер: выбрать · R: повторить · L: в лобби.";
             _result.text = text;
-            var restart = CreateButton("Повторить", new Vector2(.28f, 0), new Vector2(0, 26), new Vector2(280, 58), new Color(.08f, .48f, .53f));
-            restart.onClick.AddListener(() => { _runner.ResetRun(); _panel.SetActive(false); _result = null; });
-            var lobby = CreateButton("В лобби", new Vector2(.72f, 0), new Vector2(0, 26), new Vector2(280, 58), new Color(.38f, .24f, .25f));
-            lobby.onClick.AddListener(() => UnityEngine.SceneManagement.SceneManager.LoadScene("Lobby"));
+            var restart = CreateButton(_resultRoot, "Повторить", new Vector2(.28f, 0), new Vector2(0, 26), new Vector2(280, 58), new Color(.08f, .48f, .53f));
+            restart.onClick.AddListener(RestartRun);
+            var lobby = CreateButton(_resultRoot, "В лобби", new Vector2(.72f, 0), new Vector2(0, 26), new Vector2(280, 58), new Color(.38f, .24f, .25f));
+            lobby.onClick.AddListener(DemoSceneBuilder.ReturnToLobby);
         }
 
-        private Button CreateButton(string label, Vector2 anchor, Vector2 offset, Vector2 size, Color color)
+        private void RestartRun()
         {
-            var obj = new GameObject(label + " button", typeof(RectTransform), typeof(Image), typeof(Button)); obj.transform.SetParent(_panel.transform, false);
+            _runner.ResetRun();
+            if (_resultRoot != null) Destroy(_resultRoot.gameObject);
+            _resultRoot = null;
+            _result = null;
+            _panel.SetActive(false);
+        }
+
+        private Button CreateButton(Transform parent, string label, Vector2 anchor, Vector2 offset, Vector2 size, Color color)
+        {
+            var obj = new GameObject(label + " button", typeof(RectTransform), typeof(Image), typeof(Button)); obj.transform.SetParent(parent, false);
             var rect = obj.GetComponent<RectTransform>(); rect.anchorMin = anchor; rect.anchorMax = anchor; rect.pivot = new Vector2(.5f, 0); rect.anchoredPosition = offset; rect.sizeDelta = size;
             obj.GetComponent<Image>().color = color;
             var textObject = new GameObject("Label", typeof(RectTransform), typeof(Text)); textObject.transform.SetParent(obj.transform, false);
