@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.XR;
+using UnityEngine.SceneManagement;
+using UnityEngine.EventSystems;
 
 namespace TrainingDemo
 {
@@ -14,13 +16,15 @@ namespace TrainingDemo
         private InteractableTarget _focused;
         private InputDevice _rightHand;
         private Vector3 _velocity;
+        private bool _rightTriggerWasPressed;
 
         private void Awake()
         {
             _character = GetComponent<CharacterController>();
             if (viewCamera == null) viewCamera = GetComponentInChildren<Camera>();
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            var lobby = SceneManager.GetActiveScene().name == "Lobby";
+            Cursor.lockState = lobby ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = lobby;
         }
 
         public void SetCamera(Camera camera) => viewCamera = camera;
@@ -42,7 +46,9 @@ namespace TrainingDemo
             if (desktop)
             {
                 if (Input.GetKeyDown(KeyCode.Escape)) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
-                if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
+                var pointerOverUI = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+                if (Input.GetMouseButtonDown(0) && Cursor.lockState != CursorLockMode.Locked && !pointerOverUI)
+                { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
                 if (Cursor.lockState == CursorLockMode.Locked)
                 {
                     transform.Rotate(Vector3.up, Input.GetAxis("Mouse X") * lookSpeed);
@@ -57,13 +63,20 @@ namespace TrainingDemo
             }
 
             UpdateFocus();
-            var pressed = Input.GetKeyDown(KeyCode.E) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.JoystickButton0);
-            if (TryGetHand(out var hand) && hand.TryGetFeatureValue(CommonUsages.triggerButton, out var trigger) && trigger) pressed = true;
-            if (pressed) _focused?.Interact();
+            var pointerOnUI = desktop && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+            var pressed = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.JoystickButton0);
+            if (Input.GetMouseButtonDown(0) && !pointerOnUI) pressed = true;
+            if (TryGetHand(out var hand) && hand.TryGetFeatureValue(CommonUsages.triggerButton, out var trigger))
+            {
+                if (trigger && !_rightTriggerWasPressed) pressed = true;
+                _rightTriggerWasPressed = trigger;
+            }
+            if (pressed && !pointerOnUI) _focused?.Interact();
         }
 
         private void UpdateFocus()
         {
+            var desktop = !XRSettings.isDeviceActive;
             var origin = viewCamera.transform.position;
             var direction = viewCamera.transform.forward;
             if (XRSettings.isDeviceActive && TryGetHand(out var hand) &&
@@ -72,6 +85,12 @@ namespace TrainingDemo
             {
                 origin = transform.TransformPoint(handPosition);
                 direction = transform.rotation * handRotation * Vector3.forward;
+            }
+            else if (desktop && Cursor.lockState != CursorLockMode.Locked)
+            {
+                var pointerRay = viewCamera.ScreenPointToRay(Input.mousePosition);
+                origin = pointerRay.origin;
+                direction = pointerRay.direction;
             }
             var ray = new Ray(origin, direction);
             var next = Physics.Raycast(ray, out var hit, 3.2f) ? hit.collider.GetComponentInParent<InteractableTarget>() : null;

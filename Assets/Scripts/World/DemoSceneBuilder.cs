@@ -24,6 +24,12 @@ namespace TrainingDemo
             if (isLobby) BuildLobby(); else BuildTraining();
         }
 
+        private void Update()
+        {
+            if (isLobby && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space)))
+                SceneManager.LoadScene("Training");
+        }
+
         private void BuildRoom()
         {
             var floor = Primitive(PrimitiveType.Cube, "Floor", new Vector3(0, -0.15f, 3.5f), new Vector3(15, .3f, 18), new Color(.13f, .18f, .23f));
@@ -58,9 +64,9 @@ namespace TrainingDemo
             var eventSystem = FindObjectOfType<EventSystem>();
             if (eventSystem == null) eventSystem = new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
             if (eventSystem.GetComponent<StandaloneInputModule>() == null) eventSystem.gameObject.AddComponent<StandaloneInputModule>();
-            var panel = UIBox(canvas.transform, "Info panel", new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(540, 176), new Color(.035f, .07f, .1f, .9f));
+            var panel = UIBox(canvas.transform, "Info panel", new Vector2(0, 1), new Vector2(0, 1), new Vector2(24, -24), new Vector2(540, 208), new Color(.035f, .07f, .1f, .9f));
             _progress = UILabel(panel.transform, "Progress", new Vector2(0, 1), new Vector2(1, 1), new Vector2(18, -16), new Vector2(-36, 40), 23, new Color(.5f, .85f, 1f));
-            _message = UILabel(panel.transform, "Instruction", new Vector2(0, 1), new Vector2(1, 1), new Vector2(18, -64), new Vector2(-36, 98), 22, Color.white);
+            _message = UILabel(panel.transform, "Instruction", new Vector2(0, 1), new Vector2(1, 1), new Vector2(18, -64), new Vector2(-36, 132), 22, Color.white);
             _resultPanel = UIBox(canvas.transform, "Result panel", new Vector2(.5f, .5f), new Vector2(.5f, .5f), Vector2.zero, new Vector2(820, 600), new Color(.025f, .045f, .07f, .97f));
             _resultPanel.SetActive(false);
             var result = UILabel(_resultPanel.transform, "Results", new Vector2(0, 1), new Vector2(1, 1), new Vector2(32, -24), new Vector2(-64, 490), 23, Color.white);
@@ -72,8 +78,8 @@ namespace TrainingDemo
             Title("Лобби", "Тренировка: проверка документов\nПройдите три группы действий. Следуйте подсказкам и обращайте внимание на подсветку.");
             var start = UIButton(_canvasRoot, "Start training button", "НАЧАТЬ ТРЕНИРОВКУ", new Vector2(.5f, .5f), new Vector2(0, -110), new Vector2(420, 72), new Color(.08f, .48f, .53f));
             start.onClick.AddListener(() => SceneManager.LoadScene("Training"));
-            Station("Старт тренировки", "Начать", "lobby_start", ActionKind.Click, new Vector3(0, 1.2f, 3.2f), new Color(.08f, .48f, .53f), () => SceneManager.LoadScene("Training"));
-            Label3D("Клавиатура: WASD + мышь, E — действие\nVR: стики + триггер контроллера", new Vector3(0, 2.5f, 3f), 0.045f, Color.white);
+            Station("Старт тренировки", "Начать", "lobby_start", ActionKind.Click, new Vector3(0, 1.62f, 2.8f), new Color(.08f, .48f, .53f), () => SceneManager.LoadScene("Training"));
+            Label3D("Нажмите кнопку или Enter / пробел\nWASD — движение · мышь — обзор · E — действие", new Vector3(0, 2.35f, 3f), 0.045f, Color.white);
         }
 
         private void BuildTraining()
@@ -133,13 +139,21 @@ namespace TrainingDemo
             return obj;
         }
 
-        private TextMesh Label3D(string value, Vector3 position, float size, Color color, TextAnchor alignment = TextAnchor.MiddleCenter, float width = 4f)
+        private Text Label3D(string value, Vector3 position, float size, Color color, TextAnchor alignment = TextAnchor.MiddleCenter, float width = 4f)
         {
-            var obj = new GameObject("Label: " + value, typeof(TextMesh));
-            // Unity's built-in TextMesh faces local -Z, so turn it toward the camera and keep its top upright.
-            obj.transform.position = position; obj.transform.rotation = Quaternion.LookRotation(_camera.transform.position - position) * Quaternion.Euler(0f, 180f, 0f);
-            var text = obj.GetComponent<TextMesh>(); text.font = _font; text.text = value; text.characterSize = size; text.fontSize = 64; text.color = color;
-            text.anchor = alignment; text.alignment = TextAlignment.Center; text.richText = false; text.tabSize = 4;
+            var obj = new GameObject("Label: " + value, typeof(RectTransform), typeof(Canvas));
+            obj.transform.position = position;
+            obj.transform.rotation = Quaternion.LookRotation(_camera.transform.position - position);
+            obj.transform.localScale = Vector3.one * .001f;
+            var canvas = obj.GetComponent<Canvas>(); canvas.renderMode = RenderMode.WorldSpace; canvas.worldCamera = _camera;
+            var fontSize = Mathf.Clamp(Mathf.RoundToInt(size * 1500f), 28, 180);
+            var lineCount = value.Split('\n').Length;
+            var rect = obj.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(width * 1000f, Mathf.Max(150f, fontSize * lineCount * 1.5f));
+            var label = new GameObject("Text", typeof(RectTransform), typeof(Text)); label.transform.SetParent(obj.transform, false);
+            var textRect = label.GetComponent<RectTransform>(); textRect.anchorMin = Vector2.zero; textRect.anchorMax = Vector2.one; textRect.offsetMin = Vector2.zero; textRect.offsetMax = Vector2.zero;
+            var text = label.GetComponent<Text>(); text.font = _font; text.text = value; text.fontSize = fontSize; text.color = color;
+            text.alignment = alignment; text.horizontalOverflow = HorizontalWrapMode.Wrap; text.verticalOverflow = VerticalWrapMode.Overflow; text.raycastTarget = false;
             return text;
         }
 
@@ -197,7 +211,7 @@ namespace TrainingDemo
                 return;
             }
             _progress.text = _runner.CurrentGroup.title + "     Шаг " + (_runner.StepIndex + 1) + " из " + _runner.CurrentGroup.steps.Length;
-            _message.text = _runner.LastMessage + "\n\nПодсвеченные предметы доступны для взаимодействия.";
+            _message.text = _runner.LastMessage + "\n\nПодсвеченные предметы доступны. E / ЛКМ — действие, Esc — курсор.";
             if (_runner.IsComplete) ShowResults();
         }
 

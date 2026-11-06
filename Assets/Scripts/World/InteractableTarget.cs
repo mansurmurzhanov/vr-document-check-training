@@ -11,10 +11,19 @@ namespace TrainingDemo
         [SerializeField] private Renderer[] renderers;
         private Color[] _baseColors;
         private bool _highlighted;
+        private bool _carried;
+        private Transform _originalParent;
+        private Vector3 _originalPosition;
+        private Quaternion _originalRotation;
+        private Vector3 _originalScale;
         private OutlineHighlight _outline;
 
         private void Awake()
         {
+            _originalParent = transform.parent;
+            _originalPosition = transform.position;
+            _originalRotation = transform.rotation;
+            _originalScale = transform.localScale;
             if (renderers == null || renderers.Length == 0) renderers = GetComponentsInChildren<Renderer>();
             _outline = GetComponent<OutlineHighlight>();
             if (_outline == null) _outline = gameObject.AddComponent<OutlineHighlight>();
@@ -40,9 +49,36 @@ namespace TrainingDemo
         public void Interact()
         {
             if (action == ActionKind.Approach) return;
-            if (bypassScenario) GetComponent<SceneButtonCallback>()?.Invoke();
-            else ScenarioRunner.Instance?.Submit(action, targetId);
-            if (action == ActionKind.Grab) transform.localPosition += Vector3.up * 0.14f;
+            if (bypassScenario)
+            {
+                GetComponent<SceneButtonCallback>()?.Invoke();
+                return;
+            }
+
+            var accepted = ScenarioRunner.Instance != null && ScenarioRunner.Instance.Submit(action, targetId);
+            if (accepted && action == ActionKind.Grab) CarryDocument();
+        }
+
+        private void CarryDocument()
+        {
+            var camera = Camera.main;
+            if (camera == null) return;
+
+            // Keep the picked-up document visible at the player's lower-right, like an inspection hold.
+            transform.SetParent(camera.transform, false);
+            transform.localPosition = new Vector3(.34f, -.25f, .72f);
+            transform.localRotation = Quaternion.Euler(0f, 12f, 0f);
+            transform.localScale = _originalScale * .62f;
+            _carried = true;
+        }
+
+        public void ResetCarry()
+        {
+            if (!_carried) return;
+            transform.SetParent(_originalParent, true);
+            transform.SetPositionAndRotation(_originalPosition, _originalRotation);
+            transform.localScale = _originalScale;
+            _carried = false;
         }
 
         private void OnTriggerEnter(Collider other)

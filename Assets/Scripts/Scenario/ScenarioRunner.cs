@@ -44,9 +44,9 @@ namespace TrainingDemo
             if (_errorTone != null) Destroy(_errorTone);
         }
 
-        public void Submit(ActionKind action, string targetId)
+        public bool Submit(ActionKind action, string targetId)
         {
-            if (IsComplete) return;
+            if (IsComplete) return false;
             var expected = CurrentStep;
             if (expected.expectedAction == action && expected.targetId == targetId)
             {
@@ -54,7 +54,7 @@ namespace TrainingDemo
                 Play(_okTone);
                 LastMessage = "Верно: " + expected.title;
                 Advance();
-                return;
+                return true;
             }
 
             Play(_errorTone);
@@ -73,12 +73,14 @@ namespace TrainingDemo
                 _statuses[GroupIndex][StepIndex] = StepStatus.Failed;
                 Advance();
             }
+            return false;
         }
 
         public void ResetRun()
         {
             for (var g = 0; g < _statuses.Count; g++)
                 for (var s = 0; s < _statuses[g].Length; s++) _statuses[g][s] = StepStatus.Pending;
+            foreach (var target in FindObjectsOfType<InteractableTarget>()) target.ResetCarry();
             GroupIndex = 0;
             StepIndex = 0;
             IsComplete = false;
