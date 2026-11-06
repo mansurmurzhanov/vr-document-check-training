@@ -92,7 +92,7 @@ namespace TrainingDemo
             var start = UIButton(_canvasRoot, "Start training button", "НАЧАТЬ ТРЕНИРОВКУ", new Vector2(.5f, .5f), new Vector2(0, -110), new Vector2(420, 72), new Color(.08f, .48f, .53f));
             start.onClick.AddListener(StartTraining);
             Station("Старт тренировки", "Начать", "lobby_start", ActionKind.Click, new Vector3(0, 1.62f, 2.8f), new Color(.08f, .48f, .53f), StartTraining);
-            Label3D("Нажмите кнопку или Enter / пробел\nWASD — движение · мышь — обзор · E — действие", new Vector3(0, 2.35f, 3f), 0.045f, Color.white);
+            Label3D("Нажмите кнопку или Enter / пробел\nWASD — движение · мышь — обзор · E — действие\nVR: левый стик · поворот головы · триггер — действие", new Vector3(0, 2.35f, 3f), 0.045f, Color.white);
         }
 
         private void BuildTraining()
@@ -243,7 +243,7 @@ namespace TrainingDemo
             _progress.text = _runner.CurrentGroup.title + "     Шаг " + (_runner.StepIndex + 1) + " из " + _runner.CurrentGroup.steps.Length;
             var focused = _player != null ? _player.FocusedTarget : null;
             var focusHint = focused != null && !string.IsNullOrEmpty(focused.hint) ? "\n\n" + focused.hint : "";
-            _message.text = _runner.LastMessage + focusHint + "\n\nE / ЛКМ — действие · Esc — показать курсор.";
+            _message.text = _runner.LastMessage + focusHint + "\n\nE / ЛКМ / триггер — действие · Esc — курсор.";
             if (_runner.IsComplete) ShowResults();
         }
 
