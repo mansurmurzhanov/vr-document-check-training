@@ -23,8 +23,11 @@ namespace TrainingDemo
             Cursor.visible = false;
         }
 
+        public void SetCamera(Camera camera) => viewCamera = camera;
+
         private void Update()
         {
+            if (viewCamera == null) return;
             var desktop = !XRSettings.isDeviceActive;
             var horizontal = Input.GetAxisRaw("Horizontal");
             var vertical = Input.GetAxisRaw("Vertical");

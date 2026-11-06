@@ -31,6 +31,8 @@ public static class ProjectSetup
             new EditorBuildSettingsScene(Training, true)
         };
         EditorBuildSettings.scenes = scenes;
+        if (string.IsNullOrEmpty(EditorSceneManager.GetActiveScene().path))
+            EditorSceneManager.OpenScene(Lobby, OpenSceneMode.Single);
         AssetDatabase.SaveAssets();
     }
 
@@ -38,6 +40,9 @@ public static class ProjectSetup
     {
         const string settingsFolder = "Assets/Settings";
         const string pipelinePath = settingsFolder + "/TrainingUniversalRP.asset";
+        // Avoid asking URP for a renderer while replacing an incomplete first-run asset.
+        GraphicsSettings.defaultRenderPipeline = null;
+        QualitySettings.renderPipeline = null;
         if (!AssetDatabase.IsValidFolder(settingsFolder)) AssetDatabase.CreateFolder("Assets", "Settings");
         var pipeline = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(pipelinePath);
         if (pipeline == null)
@@ -46,8 +51,15 @@ public static class ProjectSetup
             pipeline.name = "Training Universal RP";
             AssetDatabase.CreateAsset(pipeline, pipelinePath);
         }
+        var serializedPipeline = new SerializedObject(pipeline);
+        var rendererList = serializedPipeline.FindProperty("m_RendererDataList");
+        var hasRenderer = rendererList != null && rendererList.arraySize > 0 &&
+                          rendererList.GetArrayElementAtIndex(0).objectReferenceValue != null;
+        if (!hasRenderer)
+            pipeline.LoadBuiltinRendererData();
         GraphicsSettings.defaultRenderPipeline = pipeline;
         QualitySettings.renderPipeline = pipeline;
+        AssetDatabase.SaveAssets();
     }
 
     private static void CreateScene(string path, bool lobby)
