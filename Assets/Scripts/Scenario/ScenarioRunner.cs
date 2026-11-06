@@ -61,8 +61,11 @@ namespace TrainingDemo
             LastMessage = "Ошибка: " + (targetId == expected.targetId ? "действие выполнено не в тот момент." : "выбран неверный объект или зона.");
             if (IsLaterStep(action, targetId))
             {
-                for (var i = StepIndex; i < CurrentGroup.steps.Length; i++)
+                // Record the action that broke the order as a failure; later steps were never attempted.
+                _statuses[GroupIndex][StepIndex] = StepStatus.Failed;
+                for (var i = StepIndex + 1; i < CurrentGroup.steps.Length; i++)
                     if (_statuses[GroupIndex][i] == StepStatus.Pending) _statuses[GroupIndex][i] = StepStatus.Skipped;
+                LastMessage = "Нарушен порядок действий. Группа закрыта, незавершённые шаги пропущены.";
                 AdvanceGroup();
             }
             else

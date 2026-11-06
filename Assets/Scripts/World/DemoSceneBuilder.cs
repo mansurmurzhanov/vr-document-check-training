@@ -73,7 +73,7 @@ namespace TrainingDemo
             var start = UIButton(_canvasRoot, "Start training button", "НАЧАТЬ ТРЕНИРОВКУ", new Vector2(.5f, .5f), new Vector2(0, -110), new Vector2(420, 72), new Color(.08f, .48f, .53f));
             start.onClick.AddListener(() => SceneManager.LoadScene("Training"));
             Station("Старт тренировки", "Начать", "lobby_start", ActionKind.Click, new Vector3(0, 1.2f, 3.2f), new Color(.08f, .48f, .53f), () => SceneManager.LoadScene("Training"));
-            Label3D("Клавиатура: WASD + мышь, E — действие\nVR: стики + триггер контроллера", new Vector3(0, 2.5f, 3f), 0.2f, Color.white);
+            Label3D("Клавиатура: WASD + мышь, E — действие\nVR: стики + триггер контроллера", new Vector3(0, 2.5f, 3f), 0.045f, Color.white);
         }
 
         private void BuildTraining()
@@ -92,7 +92,7 @@ namespace TrainingDemo
                 var p = positions[i];
                 var station = Primitive(PrimitiveType.Cube, titles[i], p + new Vector3(0, .55f, .9f), new Vector3(2.3f, 1.1f, .9f), new Color(.23f, .29f, .33f));
                 station.transform.rotation = Quaternion.identity;
-                Label3D(titles[i], p + new Vector3(0, 2.4f, .65f), .23f, Color.white);
+                Label3D(titles[i], p + new Vector3(0, 2.4f, .65f), .055f, Color.white);
                 var zone = Primitive(PrimitiveType.Cylinder, "Подсвеченная зона " + (i + 1), p + new Vector3(0, .04f, -.25f), new Vector3(2.7f, .04f, 1.3f), new Color(.1f, .72f, .77f));
                 var zoneTarget = zone.AddComponent<InteractableTarget>(); zoneTarget.targetId = "zone_" + (i + 1); zoneTarget.action = ActionKind.Approach;
                 var trigger = zone.GetComponent<Collider>(); trigger.isTrigger = true; zone.GetComponent<Renderer>().enabled = true;
@@ -109,15 +109,15 @@ namespace TrainingDemo
 
         private void Title(string title, string subtitle)
         {
-            Label3D(title, new Vector3(0, 3.25f, 4.7f), .48f, new Color(.57f, .89f, 1f));
-            Label3D(subtitle, new Vector3(0, 2.75f, 4.7f), .19f, Color.white, TextAnchor.UpperCenter, 6f);
+            Label3D(title, new Vector3(0, 3.25f, 4.7f), .12f, new Color(.57f, .89f, 1f));
+            Label3D(subtitle, new Vector3(0, 2.75f, 4.7f), .045f, Color.white, TextAnchor.UpperCenter, 6f);
         }
 
         private void Station(string name, string label, string id, ActionKind action, Vector3 position, Color color, System.Action onClick)
         {
             var button = Primitive(PrimitiveType.Cube, name, position, new Vector3(1.05f, .2f, .35f), color);
             var target = button.AddComponent<InteractableTarget>(); target.targetId = id; target.action = action; target.hint = label;
-            Label3D(label, position + Vector3.up * .28f, .12f, Color.white);
+            Label3D(label, position + Vector3.up * .28f, .035f, Color.white);
             if (onClick != null)
             {
                 target.bypassScenario = true;
@@ -136,7 +136,8 @@ namespace TrainingDemo
         private TextMesh Label3D(string value, Vector3 position, float size, Color color, TextAnchor alignment = TextAnchor.MiddleCenter, float width = 4f)
         {
             var obj = new GameObject("Label: " + value, typeof(TextMesh));
-            obj.transform.position = position; obj.transform.rotation = Quaternion.LookRotation(_camera.transform.position - position);
+            // Unity's built-in TextMesh faces local -Z, so turn it toward the camera and keep its top upright.
+            obj.transform.position = position; obj.transform.rotation = Quaternion.LookRotation(_camera.transform.position - position) * Quaternion.Euler(0f, 180f, 0f);
             var text = obj.GetComponent<TextMesh>(); text.font = _font; text.text = value; text.characterSize = size; text.fontSize = 64; text.color = color;
             text.anchor = alignment; text.alignment = TextAlignment.Center; text.richText = false; text.tabSize = 4;
             return text;
